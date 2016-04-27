@@ -1,22 +1,16 @@
-Godwit
+MagicMigrate
 ======
 
-Godwit aims to be a super duper slim and minimalistic tool to migrate databases.
+MagicMigrate is forked from [Godwit](https://github.com/perliedman/godwit),
+it aims to be a super duper slim and minimalistic tool to migrate databases.
 
-Currently, it support [PostgreSQL](http://www.postgresql.org/),
-using [psycopg2](http://initd.org/psycopg/). It should be a very small job
-to get it to work with another database.
+Currently, it supports [Microsoft SQL Server](https://www.microsoft.com/en-us/server-cloud/products/sql-server/),
+using [pymssql](http://pymssql.org/en/latest/).
 
 Installing
 ----------
 
-You can install Godwit using pip:
-
-```shell
-pip install godwit
-```
-
-To install from source, Godwit uses distutils, run this:
+To install from source, MagicMigrate uses distutils, run this:
 
 ```shell
 python setup.py install
@@ -34,7 +28,7 @@ lexicographic order.
 Migration can then be run from the command line:
 
 ```shell
-python -m Godwit [host] [database] [username] [password] [script-dir] [version]
+python -m MagicMigrate [host] [database] [username] [password] [script-dir] [version]
 ```
 
 This will connect to the provided ```host``` and ```database```, and migrate

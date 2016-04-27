@@ -4,11 +4,11 @@ from distutils.core import setup
 
 version = open('VERSION', 'r').read().strip()
 
-setup(name='godwit',
+setup(name='magmig',
       version=version,
       description='Minimalistic database migration tool',
-      author='Per Liedman',
-      author_email='per.liedman@kartena.se',
-      requires=['psycopg2'],
-      packages=['Godwit'],
+      author='Kristian Martensen',
+      author_email='km@shipbeat.com',
+      requires=['pymssql'],
+      packages=['MagicMigrate'],
       license='BSD')

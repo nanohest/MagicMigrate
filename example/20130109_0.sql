@@ -1,4 +1,4 @@
-create table _version (
+create table migrateme (
     version varchar(64) primary key,
     datetime timestamp
 )
