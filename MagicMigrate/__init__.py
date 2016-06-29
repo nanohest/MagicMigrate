@@ -1,5 +1,4 @@
 from os import listdir
-from datetime import datetime as dt
 import argparse
 import hashlib
 import os.path
