@@ -1,69 +1,71 @@
 from os import listdir
-import os.path
 from datetime import datetime as dt
 import argparse
-import pymssql
 import hashlib
+import os.path
 
-class Migrate:
-    def __init__(self, conn, script_dir, commit=True):
-        self.conn = conn
+class MigrateSql:
+    def __init__(self, adaptor, script_dir, commit=True):
+        self.adaptor    = adaptor
         self.script_dir = script_dir
-        self.commit = commit
+        self.commit     = commit
 
     def initialize_database_versioning(self):
         print("Initializing database for versioning")
-        create_version_table = """
-            create table magmig_schema_version (
-                version int not null unique,
-                hashvalue varchar(100),
-                description varchar(255),
-                datetime datetime2 default current_timestamp not null
-            )
-        """
-        cur = self.conn.cursor()
+        cur = self.adaptor.conn.cursor()
         try:
-            cur.execute(create_version_table)
+            cur.execute(self.adaptor.create_version_table)
         except Exception:
-            self.conn.rollback()
+            self.adaptor.conn.rollback()
             print "magmig_schema_version table could not be created"
             print "Check connection settings and permissions"
             raise
 
     def get_current_version(self):
-        cur = self.conn.cursor()
+        cur = self.adaptor.conn.cursor()
         try:
             try:
-                cur.execute(self.query_curr_version)
+                cur.execute(self.adaptor.query_curr_version)
                 return cur.fetchone()[0]
             except:
-                self.conn.rollback()
+                self.adaptor.conn.rollback()
                 return None
         finally:
             cur.close()
 
     def migrate(self, to_version=None):
-        cur = self.conn.cursor()
+        cur = self.adaptor.conn.cursor()
         try:
             for migration_script in self._get_migration_scripts(self.get_current_version(), to_version):
                 with open(os.path.join(self.script_dir, migration_script), 'r') as script_file:
                     try:
                         print "Migrating to %s" % migration_script
+                        # read file
                         content = script_file.read()
+                        # if first line is a comment
+                        # we'll treat it as a description
+                        first_line = content.lstrip().split('\n', 1)[0]
+                        description = None
+                        if first_line[0:2] == '--':
+                            description = first_line.lstrip()[2:]
+
+                        # apply changes
                         cur.execute(content)
-                        filename = os.path.splitext(migration_script)[0]
-                        cur.execute(self.query_insert_version, (str.split(filename,'_')[1],
-                                                                hashlib.sha224(content).hexdigest())
+                        version = str.split(os.path.splitext(migration_script)[0],'_')[1]
+                        cur.execute(self.adaptor.insert_version_rec,(version,
+                                                                     migration_script,
+                                                                     hashlib.sha224(content).hexdigest(),
+                                                                     description)
                         )
                     except Exception:
-                        self.conn.rollback()
+                        self.adaptor.conn.rollback()
                         print "Migration failed in script %s" % migration_script
                         raise
 
             if self.commit:
-                self.conn.commit()
+                self.adaptor.conn.commit()
             else:
-                self.conn.rollback()
+                self.adaptor.conn.rollback()
                 print "Migration was rolled back since running in dry-run mode."
         finally:
             cur.close()
@@ -71,23 +73,18 @@ class Migrate:
     def _get_migration_scripts(self, from_version=None, to_version=None):
         scripts = [x for x in listdir(self.script_dir)
             if x.endswith('.sql') and
-            (from_version is None or x > ("%s.sql" % from_version)) and
-            (to_version is None or x <= ("%s.sql" % to_version))]
+            (from_version is None or str.split(x,'_')[1] > ("%s.sql" % from_version)) and
+            (to_version is None or str.split(x,'_')[1] <= ("%s.sql" % to_version))]
 
         scripts.sort()
         return scripts
-
-class MigrateSql(Migrate):
-    query_curr_version = 'select top 1 version from magmig_schema_version order by version desc'
-    query_insert_version = 'insert into magmig_schema_version (version,hashvalue) values (%s,%s)'
-
-    def __init__(self, conn, script_dir, commit):
-        Migrate.__init__(self, conn, script_dir, commit)
 
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true', help='If set, will rollback any migrations after they complete.')
     parser.add_argument('--initdb', action='store_true', help='If set, will initialize db with magmig_schema_version table.')
+    parser.add_argument('--force', action='store_true', help='Execute migrations, even if previously run scripts have changed')
+    parser.add_argument('-adaptor', default='mssql')
     parser.add_argument('-host')
     parser.add_argument('-database')
     parser.add_argument('-username')
@@ -96,21 +93,28 @@ def main(argv):
     parser.add_argument('--version', default=None)
     args = parser.parse_args(argv[1:len(argv)])
 
-    conn = pymssql.connect(host=args.host,
-                           user=args.username,
-                           password=args.password,
-                           database=args.database,
-                           autocommit=not args.dry_run)
+    # Import and load specific db adaptor
+    fully_qualified = "adaptors.%s.DbAdaptor" % args.adaptor
+    parts = fully_qualified.split('.')
+    m = __import__( ".".join(parts[:-1]) )
+    for comp in parts[1:]:
+        m = getattr(m, comp)
+    adaptor = m(username=args.username,
+                password=args.password,
+                database=args.database,
+                hostname=args.host,
+                dry_run=args.dry_run)
+
+    # Now, let's get busy
     try:
-        m = MigrateSql(conn, args.scriptdir, commit=not args.dry_run)
+        migrator = MigrateSql(adaptor, args.scriptdir, commit=not args.dry_run)
         if args.initdb:
-            m.initialize_database_versioning()
-        m.migrate(args.version)
+            migrator.initialize_database_versioning()
+        migrator.migrate(args.version)
     finally:
-        conn.close()
+        adaptor.conn.close()
 
 if __name__ == '__main__':
-    import pymssql
     from sys import argv
 
     main(argv)
