@@ -1,5 +1,5 @@
 import pymssql
-from adaptor import Adaptor
+from adaptors.adaptor import Adaptor
 
 class DbAdaptor(Adaptor):
 

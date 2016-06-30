@@ -16,9 +16,11 @@ class MigrateSql:
             cur.execute(self.adaptor.create_version_table)
         except Exception:
             self.adaptor.conn.rollback()
-            print "magmig_schema_version table could not be created"
-            print "Check connection settings and permissions"
+            print("magmig_schema_version table could not be created")
+            print("Check connection settings and permissions")
             raise
+        finally:
+            cur.close()
 
     def get_current_version(self):
         cur = self.adaptor.conn.cursor()
@@ -38,7 +40,7 @@ class MigrateSql:
             for migration_script in self._get_migration_scripts(self.get_current_version(), to_version):
                 with open(os.path.join(self.script_dir, migration_script), 'r') as script_file:
                     try:
-                        print "Migrating to %s" % migration_script
+                        print("Migrating to %s" % migration_script)
                         # read file
                         content = script_file.read()
                         # if first line is a comment
@@ -53,19 +55,19 @@ class MigrateSql:
                         version = str.split(os.path.splitext(migration_script)[0],'_')[1]
                         cur.execute(self.adaptor.insert_version_rec,(version,
                                                                      migration_script,
-                                                                     hashlib.sha224(content).hexdigest(),
+                                                                     hashlib.sha224(content.encode('utf-8')).hexdigest(),
                                                                      description)
                         )
                     except Exception:
                         self.adaptor.conn.rollback()
-                        print "Migration failed in script %s" % migration_script
+                        print("Migration failed in script %s" % migration_script)
                         raise
 
             if self.commit:
                 self.adaptor.conn.commit()
             else:
                 self.adaptor.conn.rollback()
-                print "Migration was rolled back since running in dry-run mode."
+                print("Migration was rolled back since running in dry-run mode.")
         finally:
             cur.close()
 
