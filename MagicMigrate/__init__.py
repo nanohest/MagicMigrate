@@ -49,6 +49,7 @@ class MigrateSql:
                         description = None
                         if first_line[0:2] == '--':
                             description = first_line.lstrip()[2:]
+                            print('\t %s' % description)
 
                         # apply changes
                         cur.execute(content)
