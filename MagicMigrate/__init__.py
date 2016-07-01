@@ -74,10 +74,10 @@ class MigrateSql:
     def _get_migration_scripts(self, from_version=None, to_version=None):
         scripts = [x for x in listdir(self.script_dir)
             if x.endswith('.sql') and
-            (from_version is None or str.split(x,'_')[1] > ("%s.sql" % from_version)) and
-            (to_version is None or str.split(x,'_')[1] <= ("%s.sql" % to_version))]
-
-        scripts.sort()
+            (from_version is None or int(str.split(str.split(x,'.')[0],'_')[1]) >  int(from_version)) and
+            (to_version   is None or int(str.split(str.split(x,'.')[0],'_')[1]) <= int(to_version))]
+        # Sort scripts by version number, by taking the part before the dot, after the underscore
+        scripts.sort(key=lambda script: str.split(str.split(script,'.')[0],'_')[1])
         return scripts
 
 def main(argv):
